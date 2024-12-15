@@ -3,20 +3,280 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remove Camps</title>
+    <title>Paragon Pioneers 2 Save Game Editor</title>
+    <style>
+        .tabs {
+            display: flex;
+            cursor: pointer;
+            border-bottom: 2px solid #ccc;
+            margin-bottom: 10px;
+        }
+        .tab {
+            padding: 10px 20px;
+            border: 1px solid #ccc;
+            border-bottom: none;
+            background-color: #f1f1f1;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #fff;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+            border: 1px solid #ccc;
+            padding: 10px;
+            background-color: #fff;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .grid {
+            display: grid;
+            gap: 1px; /* 1px gap between cells */
+            margin-top: 10px;
+            background-color: #ccc; /* Gap color */
+        }
+        .grid div {
+            background-color: #fff;
+            text-align: center;
+            line-height: 32px; /* Center text vertically */
+            font-size: 12px;
+            width: 32px; /* Each cell is 32x32 pixels */
+            height: 32px;
+            position: relative;
+        }
+        .grid .type-2 {
+            background-color: blue;
+            color: white;
+        }
+        .grid .type-3 {
+            background-color: brown;
+            color: white;
+        }
+        .grid .river-hex {
+            background-color: lightblue;
+        }
+        .grid div:hover {
+            cursor: pointer;
+        }
+        .grid div:hover::after {
+            content: attr(data-coordinates);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+    </style>
 </head>
 <body>
-    <h1>Remove Camps Tool</h1>
-    <p>Select a JSON file to process and click "Remove Camps".</p>
+    <h1>Paragon Pioneers 2 Save Game Editor</h1>
+    <p>Select a JSON file with a `.dat` extension to view islands by region or modify your save.</p>
     <input type="file" id="fileInput" accept=".dat" />
-    <button id="processButton">Remove Camps</button>
+    <button id="removeCampsButton" style="margin-top: 10px;">Remove Camps</button>
     <p id="status"></p>
+    <div class="tabs">
+        <div class="tab" data-region="1">Temperate</div>
+        <div class="tab" data-region="2">Tropical</div>
+        <div class="tab" data-region="3">Northern</div>
+        <div class="tab" data-region="4">Magical</div>
+    </div>
+
+    <div id="Temperate" class="tab-content">
+        <label for="temperateDropdown">Select Island:</label>
+        <select id="temperateDropdown" class="island-dropdown" data-region="1"></select>
+        <div id="temperateGrid" class="grid-container"></div>
+    </div>
+    <div id="Tropical" class="tab-content">
+        <label for="tropicalDropdown">Select Island:</label>
+        <select id="tropicalDropdown" class="island-dropdown" data-region="2"></select>
+        <div id="tropicalGrid" class="grid-container"></div>
+    </div>
+    <div id="Northern" class="tab-content">
+        <label for="northernDropdown">Select Island:</label>
+        <select id="northernDropdown" class="island-dropdown" data-region="3"></select>
+        <div id="northernGrid" class="grid-container"></div>
+    </div>
+    <div id="Magical" class="tab-content">
+        <label for="magicalDropdown">Select Island:</label>
+        <select id="magicalDropdown" class="island-dropdown" data-region="4"></select>
+        <div id="magicalGrid" class="grid-container"></div>
+    </div>
 
     <script>
-        document.getElementById("processButton").addEventListener("click", function () {
+        const tabs = document.querySelectorAll(".tab");
+        const tabContents = document.querySelectorAll(".tab-content");
+        const dropdowns = {
+            "1": document.getElementById("temperateDropdown"),
+            "2": document.getElementById("tropicalDropdown"),
+            "3": document.getElementById("northernDropdown"),
+            "4": document.getElementById("magicalDropdown"),
+        };
+        const gridContainers = {
+            "1": document.getElementById("temperateGrid"),
+            "2": document.getElementById("tropicalGrid"),
+            "3": document.getElementById("northernGrid"),
+            "4": document.getElementById("magicalGrid"),
+        };
+
+        let islands = []; // To store islands from JSON
+
+        document.getElementById("fileInput").addEventListener("change", function (event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    console.log("File loaded successfully.");
+                    const jsonData = JSON.parse(e.target.result);
+                    console.log("Parsed JSON Data:", jsonData);
+
+                    const islandManager = jsonData["IslandManager"];
+                    if (!islandManager || !islandManager["islands"]) {
+                        alert("Invalid JSON structure.");
+                        console.log("JSON does not have an 'IslandManager' or 'islands'.");
+                        return;
+                    }
+
+                    islands = islandManager["islands"];
+                    console.log("Islands loaded:", islands);
+
+                    populateDropdowns();
+                } catch (err) {
+                    alert("Error parsing JSON: " + err.message);
+                    console.log("Parsing error:", err);
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        tabs.forEach(tab => {
+            tab.addEventListener("click", function () {
+                // Remove active class from all tabs and contents
+                tabs.forEach(t => t.classList.remove("active"));
+                tabContents.forEach(tc => tc.classList.remove("active"));
+
+                // Add active class to the selected tab and its content
+                tab.classList.add("active");
+                document.getElementById(tab.textContent).classList.add("active");
+            });
+        });
+
+        function populateDropdowns() {
+            Object.keys(dropdowns).forEach(region => {
+                const dropdown = dropdowns[region];
+                dropdown.innerHTML = ""; // Clear existing options
+
+                console.log(`Populating dropdown for region: ${region}`);
+
+                // Filter islands by region
+                const filteredIslands = islands.filter(island => {
+                    return island.MapSettings?.Region === parseInt(region, 10);
+                });
+
+                console.log(`Filtered islands for region ${region}:`, filteredIslands);
+
+                // Populate dropdown and display the grid for the first island
+                if (filteredIslands.length > 0) {
+                    filteredIslands.forEach((island, index) => {
+                        const option = document.createElement("option");
+                        option.value = JSON.stringify(island); // Store island object as string
+                        option.textContent = island.Name || `Island (Region ${region})`;
+                        dropdown.appendChild(option);
+
+                        // Display grid for the first island in the list
+                        if (index === 0) {
+                            drawGrid(region, island);
+                        }
+                    });
+
+                    // Add an event listener to change the grid when a different island is selected
+                    dropdown.addEventListener("change", function () {
+                        const selectedIsland = JSON.parse(this.value);
+                        console.log(`Selected Island:`, selectedIsland);
+                        drawGrid(region, selectedIsland);
+                    });
+                } else {
+                    console.log(`No islands found for region ${region}.`);
+                    const noOption = document.createElement("option");
+                    noOption.textContent = "No islands available";
+                    dropdown.appendChild(noOption);
+                }
+            });
+
+            console.log("Dropdowns populated successfully.");
+        }
+
+        function drawGrid(region, island) {
+            const gridContainer = gridContainers[region];
+            const mapSize = island.MapSettings?.MapSize;
+            const gridData = island.Grid;
+
+            if (!mapSize || !gridData) {
+                console.log("Invalid grid data or map size.");
+                gridContainer.innerHTML = "No grid data available.";
+                return;
+            }
+
+            const [width, height] = mapSize;
+            console.log(`Drawing grid of size ${width}x${height} for region ${region}.`);
+
+            gridContainer.innerHTML = ""; // Clear previous grid
+            gridContainer.style.gridTemplateColumns = `repeat(${width}, 32px)`;
+            gridContainer.style.gridTemplateRows = `repeat(${height}, 32px)`;
+            gridContainer.classList.add("grid");
+
+            // Adjust rendering order to make (0,0) bottom-left
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = 0; x < width; x++) {
+                    const cellData = gridData.find(cell => {
+                        return cell.Coordinate[0] === x && cell.Coordinate[1] === y;
+                    });
+
+                    const cell = document.createElement("div");
+
+                    if (cellData) {
+                        // Display DepositType if it exists
+                        if (cellData.DepositType) {
+                            cell.textContent = cellData.DepositType;
+                        }
+
+                        // Apply river hex styling if IsRiver is true
+                        if (cellData.IsRiver) {
+                            cell.classList.add("river-hex");
+                        } 
+                        // Apply blue styling for Type === 2
+                        else if (cellData.Type === 2) {
+                            cell.classList.add("type-2");
+                        } 
+                        // Apply brown styling for Type === 3
+                        else if (cellData.Type === 3) {
+                            cell.classList.add("type-3");
+                        }
+
+                        // Add tooltip for coordinates
+                        if (cellData.Coordinate && cellData.Coordinate.length === 2) {
+                            const [cellX, cellY] = cellData.Coordinate;
+                            cell.setAttribute("data-coordinates", `${cellX},${cellY}`);
+                        }
+                    }
+
+                    gridContainer.appendChild(cell);
+                }
+            }
+        }
+
+        document.getElementById("removeCampsButton").addEventListener("click", function () {
             const fileInput = document.getElementById("fileInput");
             const status = document.getElementById("status");
-
+            
             if (!fileInput.files[0]) {
                 alert("Please select a file first.");
                 return;

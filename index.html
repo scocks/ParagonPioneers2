@@ -38,12 +38,14 @@
             background-color: #ccc;
         }
         .grid div {
+            position: relative;
             background-color: #fff;
             text-align: center;
             line-height: 32px;
             font-size: 12px;
             width: 32px;
             height: 32px;
+            overflow: hidden;
         }
         .grid .type-2 {
             background-color: blue;
@@ -55,6 +57,15 @@
         }
         .grid .river-hex {
             background-color: lightblue;
+        }
+        .grid img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%; /* Scale to fit the grid cell */
+            height: 100%; /* Scale to fit the grid cell */
+            object-fit: contain; /* Ensure the image aspect ratio is maintained */
+            pointer-events: none; /* Allow clicks to pass through the image */
         }
     </style>
 </head>
@@ -283,6 +294,7 @@
             gridContainer.innerHTML = "";
             const mapSize = island.MapSettings?.MapSize || [];
             const gridData = island.Grid || [];
+            const gameEntities = island.GameEntities || [];
 
             const [width, height] = mapSize;
             console.log(`Drawing grid of size ${width}x${height} for region ${regionName}.`);
@@ -324,6 +336,15 @@
                             const [cellX, cellY] = cellData.Coordinate;
                             cell.setAttribute("data-coordinates", `${cellX},${cellY}`);
                         }
+
+                        const gameEntity = gameEntities.find(entity => entity.xy[0] === x && entity.xy[1] === y);
+                        if (gameEntity) {
+                            const img = document.createElement("img");
+                            img.src = `images/${gameEntity.id}.png`; // Use entity id to reference image file
+                            img.alt = gameEntity.id;
+                            cell.appendChild(img);
+                        }
+
                     }
 
                     gridContainer.appendChild(cell);
